@@ -15,22 +15,22 @@
             <div class="container">
                 <h1 class="logo">房屋租赁系统</h1>
                 <div class="nav-links">
-                    <a href="#" @click="showHome" v-if="currentUser">首页</a>
-                    <a href="#" @click="showMyHouses" v-if="currentUser && currentUser.role === 'LANDLORD'">我的房源</a>
-                    <a href="#" @click="showMyOrders" v-if="currentUser">我的订单</a>
-                    <a href="#" @click="showMyFavorites" v-if="currentUser && currentUser.role === 'USER'">我的收藏</a>
-                    <a href="#" @click="showMyRepairs" v-if="currentUser && currentUser.role === 'USER'">维修报修</a>
-                    <a href="#" @click="showLandlordRepairs" v-if="currentUser && currentUser.role === 'LANDLORD'">维修管理</a>
-                    <a href="#" @click="showNotifications" v-if="currentUser" class="notification-link">
+                    <a href="#" @click.prevent="showHome" v-if="currentUser">首页</a>
+                    <a href="#" @click.prevent="showMyHouses" v-if="currentUser && currentUser.role === 'LANDLORD'">我的房源</a>
+                    <a href="#" @click.prevent="showMyOrders" v-if="currentUser">我的订单</a>
+                    <a href="#" @click.prevent="showMyFavorites" v-if="currentUser && currentUser.role === 'USER'">我的收藏</a>
+                    <a href="#" @click.prevent="showMyRepairs" v-if="currentUser && currentUser.role === 'USER'">维修报修</a>
+                    <a href="#" @click.prevent="showLandlordRepairs" v-if="currentUser && currentUser.role === 'LANDLORD'">维修管理</a>
+                    <a href="#" @click.prevent="showNotifications" v-if="currentUser" class="notification-link">
                         消息通知
                         <span v-if="unreadCount > 0" class="badge">{{ unreadCount }}</span>
                     </a>
-                    <a href="#" @click="showAdminUsers" v-if="currentUser && currentUser.role === 'ADMIN'">用户管理</a>
-                    <a href="#" @click="showAdminHouses" v-if="currentUser && currentUser.role === 'ADMIN'">房源管理</a>
-                    <a href="#" @click="showAdminOrders" v-if="currentUser && currentUser.role === 'ADMIN'">订单管理</a>
-                    <a href="#" @click="showAdminStats" v-if="currentUser && currentUser.role === 'ADMIN'">数据统计</a>
-                    <a href="#" @click="showLogin" v-if="!currentUser">登录</a>
-                    <a href="#" @click="showRegister" v-if="!currentUser">注册</a>
+                    <a href="#" @click.prevent="showAdminUsers" v-if="currentUser && currentUser.role === 'ADMIN'">用户管理</a>
+                    <a href="#" @click.prevent="showAdminHouses" v-if="currentUser && currentUser.role === 'ADMIN'">房源管理</a>
+                    <a href="#" @click.prevent="showAdminOrders" v-if="currentUser && currentUser.role === 'ADMIN'">订单管理</a>
+                    <a href="#" @click.prevent="showAdminStats" v-if="currentUser && currentUser.role === 'ADMIN'">数据统计</a>
+                    <a href="#" @click.prevent="showLogin" v-if="!currentUser">登录</a>
+                    <a href="#" @click.prevent="showRegister" v-if="!currentUser">注册</a>
                     <span v-if="currentUser" class="user-info">
                         欢迎，{{ currentUser.realName || currentUser.username }}
                         <button @click="logout" class="btn-logout">退出</button>

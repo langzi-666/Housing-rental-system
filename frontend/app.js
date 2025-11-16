@@ -280,11 +280,14 @@ createApp({
                     : `${this.apiBaseUrl}/order/tenant/${this.currentUser.id}`;
                 const response = await axios.get(url);
                 if (response.data.code === 200) {
-                    this.myOrders = response.data.data;
+                    this.myOrders = response.data.data || [];
                     this.currentView = 'myOrders';
+                } else {
+                    this.showMessage(response.data.message || '加载订单失败', 'error');
                 }
             } catch (error) {
-                this.showMessage('加载订单失败', 'error');
+                console.error('加载订单失败:', error);
+                this.showMessage('加载订单失败：' + (error.response?.data?.message || error.message), 'error');
             }
         },
         async confirmOrder(orderId) {
@@ -597,11 +600,14 @@ createApp({
             try {
                 const response = await axios.get(`${this.apiBaseUrl}/notification/user/${this.currentUser.id}`);
                 if (response.data.code === 200) {
-                    this.notifications = response.data.data;
+                    this.notifications = response.data.data || [];
                     this.currentView = 'notifications';
+                } else {
+                    this.showMessage(response.data.message || '加载通知失败', 'error');
                 }
             } catch (error) {
-                this.showMessage('加载通知失败', 'error');
+                console.error('加载通知失败:', error);
+                this.showMessage('加载通知失败：' + (error.response?.data?.message || error.message), 'error');
             }
         },
         async loadUnreadCount() {
