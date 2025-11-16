@@ -1,0 +1,16 @@
+com\housing\entity\House.class
+com\housing\entity\Order.class
+com\housing\HousingRentalApplication.class
+com\housing\controller\UserController.class
+com\housing\service\UserService.class
+com\housing\dao\OrderRepository.class
+com\housing\controller\HouseController.class
+com\housing\dao\UserRepository.class
+com\housing\controller\OrderController.class
+com\housing\dao\HouseRepository.class
+com\housing\config\CorsConfig.class
+com\housing\dto\LoginRequest.class
+com\housing\service\HouseService.class
+com\housing\entity\User.class
+com\housing\service\OrderService.class
+com\housing\dto\ApiResponse.class

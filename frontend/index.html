@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>房屋租赁系统</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- 导航栏 -->
+        <nav class="navbar">
+            <div class="container">
+                <h1 class="logo">房屋租赁系统</h1>
+                <div class="nav-links">
+                    <a href="#" @click="showHome" v-if="currentUser">首页</a>
+                    <a href="#" @click="showMyHouses" v-if="currentUser && currentUser.role === 'LANDLORD'">我的房源</a>
+                    <a href="#" @click="showMyOrders" v-if="currentUser">我的订单</a>
+                    <a href="#" @click="showMyFavorites" v-if="currentUser && currentUser.role === 'USER'">我的收藏</a>
+                    <a href="#" @click="showMyRepairs" v-if="currentUser && currentUser.role === 'USER'">维修报修</a>
+                    <a href="#" @click="showLandlordRepairs" v-if="currentUser && currentUser.role === 'LANDLORD'">维修管理</a>
+                    <a href="#" @click="showNotifications" v-if="currentUser" class="notification-link">
+                        消息通知
+                        <span v-if="unreadCount > 0" class="badge">{{ unreadCount }}</span>
+                    </a>
+                    <a href="#" @click="showAdminUsers" v-if="currentUser && currentUser.role === 'ADMIN'">用户管理</a>
+                    <a href="#" @click="showAdminHouses" v-if="currentUser && currentUser.role === 'ADMIN'">房源管理</a>
+                    <a href="#" @click="showAdminOrders" v-if="currentUser && currentUser.role === 'ADMIN'">订单管理</a>
+                    <a href="#" @click="showAdminStats" v-if="currentUser && currentUser.role === 'ADMIN'">数据统计</a>
+                    <a href="#" @click="showLogin" v-if="!currentUser">登录</a>
+                    <a href="#" @click="showRegister" v-if="!currentUser">注册</a>
+                    <span v-if="currentUser" class="user-info">
+                        欢迎，{{ currentUser.realName || currentUser.username }}
+                        <button @click="logout" class="btn-logout">退出</button>
+                    </span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主要内容区域 -->
+        <main class="container">
+            <!-- 登录页面 -->
+            <div v-if="currentView === 'login'" class="auth-container">
+                <div class="auth-box">
+                    <h2>用户登录</h2>
+                    <form @submit.prevent="login">
+                        <div class="form-group">
+                            <label>用户名：</label>
+                            <input type="text" v-model="loginForm.username" required>
+                        </div>
+                        <div class="form-group">
+                            <label>密码：</label>
+                            <input type="password" v-model="loginForm.password" required>
+                        </div>
+                        <button type="submit" class="btn-primary">登录</button>
+                        <p class="auth-link">还没有账号？<a href="#" @click.prevent="showRegister">立即注册</a></p>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 注册页面 -->
+            <div v-if="currentView === 'register'" class="auth-container">
+                <div class="auth-box">
+                    <h2>用户注册</h2>
+                    <form @submit.prevent="register">
+                        <div class="form-group">
+                            <label>用户名：</label>
+                            <input type="text" v-model="registerForm.username" required>
+                        </div>
+                        <div class="form-group">
+                            <label>密码：</label>
+                            <input type="password" v-model="registerForm.password" required>
+                        </div>
+                        <div class="form-group">
+                            <label>真实姓名：</label>
+                            <input type="text" v-model="registerForm.realName">
+                        </div>
+                        <div class="form-group">
+                            <label>手机号：</label>
+                            <input type="text" v-model="registerForm.phone">
+                        </div>
+                        <div class="form-group">
+                            <label>邮箱：</label>
+                            <input type="email" v-model="registerForm.email">
+                        </div>
+                        <div class="form-group">
+                            <label>角色：</label>
+                            <select v-model="registerForm.role">
+                                <option value="USER">租客</option>
+                                <option value="LANDLORD">房东</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary">注册</button>
+                        <p class="auth-link">已有账号？<a href="#" @click.prevent="showLogin">立即登录</a></p>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 首页 - 房屋列表 -->
+            <div v-if="currentView === 'home'">
+                <div class="search-bar">
+                    <input type="text" v-model="searchKeyword" placeholder="搜索房屋（标题、地址、描述）" @input="searchHouses">
+                    <button @click="searchHouses" class="btn-primary">搜索</button>
+                </div>
+                <div class="house-list">
+                    <div v-for="house in houses" :key="house.id" class="house-card" @click="showHouseDetail(house.id)">
+                        <div class="house-image">
+                            <span v-if="!house.images">暂无图片</span>
+                        </div>
+                        <div class="house-info">
+                            <h3>{{ house.title }}</h3>
+                            <p class="house-address">{{ house.address }}</p>
+                            <div class="house-details">
+                                <span>面积：{{ house.area }}㎡</span>
+                                <span>户型：{{ house.roomType }}</span>
+                                <span>楼层：{{ house.floor }}</span>
+                                <span>朝向：{{ house.orientation }}</span>
+                            </div>
+                            <p class="house-description">{{ house.description }}</p>
+                            <div class="house-footer">
+                                <span class="price">¥{{ house.price }}/月</span>
+                                <span class="status" :class="house.status.toLowerCase()">{{ getStatusText(house.status) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="houses.length === 0" class="empty-state">
+                        <p>暂无房屋信息</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 房屋详情 -->
+            <div v-if="currentView === 'detail'">
+                <button @click="showHome" class="btn-back">← 返回列表</button>
+                <div v-if="currentHouse" class="house-detail">
+                    <h2>{{ currentHouse.title }}</h2>
+                    <div class="detail-info">
+                        <p><strong>地址：</strong>{{ currentHouse.address }}</p>
+                        <p><strong>面积：</strong>{{ currentHouse.area }}㎡</p>
+                        <p><strong>户型：</strong>{{ currentHouse.roomType }}</p>
+                        <p><strong>楼层：</strong>{{ currentHouse.floor }}</p>
+                        <p><strong>朝向：</strong>{{ currentHouse.orientation }}</p>
+                        <p><strong>月租金：</strong><span class="price-large">¥{{ currentHouse.price }}</span></p>
+                        <p><strong>状态：</strong><span class="status" :class="currentHouse.status.toLowerCase()">{{ getStatusText(currentHouse.status) }}</span></p>
+                    </div>
+                    <div class="detail-description">
+                        <h3>房屋描述</h3>
+                        <p>{{ currentHouse.description }}</p>
+                    </div>
+                    <div v-if="currentHouse.facilities" class="facilities">
+                        <h3>设施</h3>
+                        <p>{{ currentHouse.facilities }}</p>
+                    </div>
+                    <div v-if="currentUser && currentUser.role === 'USER'" class="house-actions-detail">
+                        <button @click="toggleFavorite(currentHouse.id)" class="btn-secondary">收藏</button>
+                        <button @click="showReviews(currentHouse.id)" class="btn-secondary">查看评价</button>
+                    </div>
+                    <div v-if="currentUser && currentUser.role === 'USER' && currentHouse.status === 'AVAILABLE'" class="order-section">
+                        <h3>立即预订</h3>
+                        <form @submit.prevent="createOrder">
+                            <div class="form-group">
+                                <label>租期开始日期：</label>
+                                <input type="date" v-model="orderForm.rentStartDate" required>
+                            </div>
+                            <div class="form-group">
+                                <label>租期结束日期：</label>
+                                <input type="date" v-model="orderForm.rentEndDate" required>
+                            </div>
+                            <button type="submit" class="btn-primary">提交订单</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 我的房源（房东） -->
+            <div v-if="currentView === 'myHouses'">
+                <div class="page-header">
+                    <h2>我的房源</h2>
+                    <button @click="showAddHouse" class="btn-primary">添加房源</button>
+                </div>
+                <div class="house-list">
+                    <div v-for="house in myHouses" :key="house.id" class="house-card">
+                        <div class="house-info">
+                            <h3>{{ house.title }}</h3>
+                            <p class="house-address">{{ house.address }}</p>
+                            <div class="house-details">
+                                <span>面积：{{ house.area }}㎡</span>
+                                <span>价格：¥{{ house.price }}/月</span>
+                                <span class="status" :class="house.status.toLowerCase()">{{ getStatusText(house.status) }}</span>
+                            </div>
+                            <div class="house-actions">
+                                <button @click="editHouse(house)" class="btn-secondary">编辑</button>
+                                <button @click="deleteHouse(house.id)" class="btn-danger">删除</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 添加/编辑房源 -->
+            <div v-if="currentView === 'addHouse' || currentView === 'editHouse'">
+                <button @click="showMyHouses" class="btn-back">← 返回</button>
+                <div class="form-container">
+                    <h2>{{ currentView === 'addHouse' ? '添加房源' : '编辑房源' }}</h2>
+                    <form @submit.prevent="saveHouse">
+                        <div class="form-group">
+                            <label>标题：</label>
+                            <input type="text" v-model="houseForm.title" required>
+                        </div>
+                        <div class="form-group">
+                            <label>地址：</label>
+                            <input type="text" v-model="houseForm.address" required>
+                        </div>
+                        <div class="form-group">
+                            <label>面积（㎡）：</label>
+                            <input type="number" step="0.01" v-model="houseForm.area" required>
+                        </div>
+                        <div class="form-group">
+                            <label>月租金（元）：</label>
+                            <input type="number" step="0.01" v-model="houseForm.price" required>
+                        </div>
+                        <div class="form-group">
+                            <label>户型：</label>
+                            <input type="text" v-model="houseForm.roomType">
+                        </div>
+                        <div class="form-group">
+                            <label>楼层：</label>
+                            <input type="text" v-model="houseForm.floor">
+                        </div>
+                        <div class="form-group">
+                            <label>朝向：</label>
+                            <input type="text" v-model="houseForm.orientation">
+                        </div>
+                        <div class="form-group">
+                            <label>描述：</label>
+                            <textarea v-model="houseForm.description" rows="4"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>设施：</label>
+                            <input type="text" v-model="houseForm.facilities" placeholder="例如：空调,洗衣机,冰箱">
+                        </div>
+                        <div class="form-group">
+                            <label>状态：</label>
+                            <select v-model="houseForm.status">
+                                <option value="AVAILABLE">可租</option>
+                                <option value="RENTED">已租</option>
+                                <option value="OFFLINE">下架</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary">保存</button>
+                        <button type="button" @click="showMyHouses" class="btn-secondary">取消</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 我的订单 -->
+            <div v-if="currentView === 'myOrders'">
+                <h2>我的订单</h2>
+                <div class="order-list">
+                    <div v-for="order in myOrders" :key="order.id" class="order-card">
+                        <div class="order-header">
+                            <span class="order-no">订单号：{{ order.orderNo }}</span>
+                            <span class="status" :class="order.status.toLowerCase()">{{ getOrderStatusText(order.status) }}</span>
+                        </div>
+                        <div class="order-info">
+                            <p><strong>房屋ID：</strong>{{ order.houseId }}</p>
+                            <p><strong>租期：</strong>{{ order.rentStartDate }} 至 {{ order.rentEndDate }}</p>
+                            <p><strong>月租金：</strong>¥{{ order.monthlyRent }}</p>
+                            <p><strong>总金额：</strong><span class="price">¥{{ order.totalAmount }}</span></p>
+                            <p><strong>创建时间：</strong>{{ order.createTime }}</p>
+                        </div>
+                        <div class="order-actions" v-if="currentUser.role === 'LANDLORD' && order.status === 'PENDING'">
+                            <button @click="confirmOrder(order.id)" class="btn-primary">确认订单</button>
+                            <button @click="cancelOrder(order.id)" class="btn-danger">取消订单</button>
+                        </div>
+                        <div class="order-actions" v-if="currentUser.role === 'USER' && order.status === 'PENDING'">
+                            <button @click="cancelOrder(order.id)" class="btn-danger">取消订单</button>
+                        </div>
+                    </div>
+                    <div v-if="myOrders.length === 0" class="empty-state">
+                        <p>暂无订单</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 管理员 - 用户管理 -->
+            <div v-if="currentView === 'adminUsers'">
+                <div class="page-header">
+                    <h2>用户管理</h2>
+                </div>
+                <div class="admin-table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>用户名</th>
+                                <th>真实姓名</th>
+                                <th>手机号</th>
+                                <th>邮箱</th>
+                                <th>角色</th>
+                                <th>注册时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="user in allUsers" :key="user.id">
+                                <td>{{ user.id }}</td>
+                                <td>{{ user.username }}</td>
+                                <td>{{ user.realName || '-' }}</td>
+                                <td>{{ user.phone || '-' }}</td>
+                                <td>{{ user.email || '-' }}</td>
+                                <td>
+                                    <span class="role-badge" :class="user.role.toLowerCase()">
+                                        {{ getRoleText(user.role) }}
+                                    </span>
+                                </td>
+                                <td>{{ formatDate(user.createTime) }}</td>
+                                <td>
+                                    <button @click="editUser(user)" class="btn-secondary btn-sm">编辑</button>
+                                    <button @click="deleteUser(user.id)" class="btn-danger btn-sm" v-if="user.id !== currentUser.id">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div v-if="allUsers.length === 0" class="empty-state">
+                        <p>暂无用户</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 管理员 - 编辑用户 -->
+            <div v-if="currentView === 'editUser'">
+                <button @click="showAdminUsers" class="btn-back">← 返回</button>
+                <div class="form-container">
+                    <h2>编辑用户</h2>
+                    <form @submit.prevent="saveUser">
+                        <div class="form-group">
+                            <label>用户名：</label>
+                            <input type="text" v-model="userForm.username" required>
+                        </div>
+                        <div class="form-group">
+                            <label>真实姓名：</label>
+                            <input type="text" v-model="userForm.realName">
+                        </div>
+                        <div class="form-group">
+                            <label>手机号：</label>
+                            <input type="text" v-model="userForm.phone">
+                        </div>
+                        <div class="form-group">
+                            <label>邮箱：</label>
+                            <input type="email" v-model="userForm.email">
+                        </div>
+                        <div class="form-group">
+                            <label>角色：</label>
+                            <select v-model="userForm.role">
+                                <option value="USER">租客</option>
+                                <option value="LANDLORD">房东</option>
+                                <option value="ADMIN">管理员</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary">保存</button>
+                        <button type="button" @click="showAdminUsers" class="btn-secondary">取消</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 管理员 - 房源管理 -->
+            <div v-if="currentView === 'adminHouses'">
+                <div class="page-header">
+                    <h2>房源管理</h2>
+                </div>
+                <div class="admin-table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>标题</th>
+                                <th>地址</th>
+                                <th>面积(㎡)</th>
+                                <th>月租金(元)</th>
+                                <th>状态</th>
+                                <th>房东ID</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="house in allHouses" :key="house.id">
+                                <td>{{ house.id }}</td>
+                                <td>{{ house.title }}</td>
+                                <td>{{ house.address }}</td>
+                                <td>{{ house.area }}</td>
+                                <td>¥{{ house.price }}</td>
+                                <td>
+                                    <span class="status" :class="house.status.toLowerCase()">
+                                        {{ getStatusText(house.status) }}
+                                    </span>
+                                </td>
+                                <td>{{ house.landlordId }}</td>
+                                <td>{{ formatDate(house.createTime) }}</td>
+                                <td>
+                                    <button @click="adminEditHouse(house)" class="btn-secondary btn-sm">编辑</button>
+                                    <button @click="adminDeleteHouse(house.id)" class="btn-danger btn-sm">删除</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div v-if="allHouses.length === 0" class="empty-state">
+                        <p>暂无房源</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 管理员 - 编辑房源 -->
+            <div v-if="currentView === 'adminEditHouse'">
+                <button @click="showAdminHouses" class="btn-back">← 返回</button>
+                <div class="form-container">
+                    <h2>编辑房源</h2>
+                    <form @submit.prevent="adminSaveHouse">
+                        <div class="form-group">
+                            <label>标题：</label>
+                            <input type="text" v-model="houseForm.title" required>
+                        </div>
+                        <div class="form-group">
+                            <label>地址：</label>
+                            <input type="text" v-model="houseForm.address" required>
+                        </div>
+                        <div class="form-group">
+                            <label>面积（㎡）：</label>
+                            <input type="number" step="0.01" v-model="houseForm.area" required>
+                        </div>
+                        <div class="form-group">
+                            <label>月租金（元）：</label>
+                            <input type="number" step="0.01" v-model="houseForm.price" required>
+                        </div>
+                        <div class="form-group">
+                            <label>户型：</label>
+                            <input type="text" v-model="houseForm.roomType">
+                        </div>
+                        <div class="form-group">
+                            <label>楼层：</label>
+                            <input type="text" v-model="houseForm.floor">
+                        </div>
+                        <div class="form-group">
+                            <label>朝向：</label>
+                            <input type="text" v-model="houseForm.orientation">
+                        </div>
+                        <div class="form-group">
+                            <label>描述：</label>
+                            <textarea v-model="houseForm.description" rows="4"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>设施：</label>
+                            <input type="text" v-model="houseForm.facilities" placeholder="例如：空调,洗衣机,冰箱">
+                        </div>
+                        <div class="form-group">
+                            <label>状态：</label>
+                            <select v-model="houseForm.status">
+                                <option value="AVAILABLE">可租</option>
+                                <option value="RENTED">已租</option>
+                                <option value="OFFLINE">下架</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary">保存</button>
+                        <button type="button" @click="showAdminHouses" class="btn-secondary">取消</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 管理员 - 订单管理 -->
+            <div v-if="currentView === 'adminOrders'">
+                <div class="page-header">
+                    <h2>订单管理</h2>
+                </div>
+                <div class="admin-table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>订单号</th>
+                                <th>房屋ID</th>
+                                <th>租客ID</th>
+                                <th>房东ID</th>
+                                <th>租期</th>
+                                <th>月租金</th>
+                                <th>总金额</th>
+                                <th>状态</th>
+                                <th>创建时间</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="order in allOrders" :key="order.id">
+                                <td>{{ order.orderNo }}</td>
+                                <td>{{ order.houseId }}</td>
+                                <td>{{ order.tenantId }}</td>
+                                <td>{{ order.landlordId }}</td>
+                                <td>{{ order.rentStartDate }} 至 {{ order.rentEndDate }}</td>
+                                <td>¥{{ order.monthlyRent }}</td>
+                                <td>¥{{ order.totalAmount }}</td>
+                                <td>
+                                    <span class="status" :class="order.status.toLowerCase()">
+                                        {{ getOrderStatusText(order.status) }}
+                                    </span>
+                                </td>
+                                <td>{{ formatDate(order.createTime) }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div v-if="allOrders.length === 0" class="empty-state">
+                        <p>暂无订单</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 管理员 - 数据统计 -->
+            <div v-if="currentView === 'adminStats'">
+                <div class="page-header">
+                    <h2>数据统计</h2>
+                </div>
+                <div class="stats-container">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>用户总数</h3>
+                            <p class="stat-number">{{ stats.totalUsers }}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>房源总数</h3>
+                            <p class="stat-number">{{ stats.totalHouses }}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>可租房源</h3>
+                            <p class="stat-number">{{ stats.availableHouses }}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>订单总数</h3>
+                            <p class="stat-number">{{ stats.totalOrders }}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>待确认订单</h3>
+                            <p class="stat-number">{{ stats.pendingOrders }}</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>已确认订单</h3>
+                            <p class="stat-number">{{ stats.confirmedOrders }}</p>
+                        </div>
+                    </div>
+                    <div class="stats-detail">
+                        <h3>用户角色分布</h3>
+                        <div class="role-stats">
+                            <p>租客：{{ stats.userCount }} 人</p>
+                            <p>房东：{{ stats.landlordCount }} 人</p>
+                            <p>管理员：{{ stats.adminCount }} 人</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 我的收藏 -->
+            <div v-if="currentView === 'myFavorites'">
+                <div class="page-header">
+                    <h2>我的收藏</h2>
+                </div>
+                <div class="house-list">
+                    <div v-for="favorite in favorites" :key="favorite.id" class="house-card">
+                        <div class="house-info">
+                            <h3>房屋ID: {{ favorite.houseId }}</h3>
+                            <div class="house-actions">
+                                <button @click="showHouseDetail(favorite.houseId)" class="btn-secondary">查看详情</button>
+                                <button @click="removeFavorite(favorite.id, favorite.houseId)" class="btn-danger">取消收藏</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="favorites.length === 0" class="empty-state">
+                        <p>暂无收藏</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 消息通知 -->
+            <div v-if="currentView === 'notifications'">
+                <div class="page-header">
+                    <h2>消息通知</h2>
+                    <button @click="markAllNotificationsAsRead" class="btn-secondary">全部标记为已读</button>
+                </div>
+                <div class="notification-list">
+                    <div v-for="notification in notifications" :key="notification.id" 
+                         class="notification-card" :class="{ 'unread': !notification.isRead }">
+                        <div class="notification-header">
+                            <h3>{{ notification.title }}</h3>
+                            <span class="notification-time">{{ formatDate(notification.createTime) }}</span>
+                        </div>
+                        <p class="notification-content">{{ notification.content }}</p>
+                        <div class="notification-actions">
+                            <button v-if="!notification.isRead" @click="markNotificationAsRead(notification.id)" 
+                                    class="btn-secondary btn-sm">标记为已读</button>
+                        </div>
+                    </div>
+                    <div v-if="notifications.length === 0" class="empty-state">
+                        <p>暂无通知</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 我的报修（租客） -->
+            <div v-if="currentView === 'myRepairs'">
+                <div class="page-header">
+                    <h2>我的报修</h2>
+                    <button @click="showAddRepair(null)" class="btn-primary">新增报修</button>
+                </div>
+                <div class="repair-list">
+                    <div v-for="repair in repairs" :key="repair.id" class="repair-card">
+                        <div class="repair-header">
+                            <h3>{{ repair.title }}</h3>
+                            <span class="status" :class="repair.status.toLowerCase()">{{ getRepairStatusText(repair.status) }}</span>
+                        </div>
+                        <p class="repair-description">{{ repair.description }}</p>
+                        <div class="repair-info">
+                            <p><strong>房屋ID：</strong>{{ repair.houseId }}</p>
+                            <p><strong>创建时间：</strong>{{ formatDate(repair.createTime) }}</p>
+                            <p v-if="repair.reply"><strong>房东回复：</strong>{{ repair.reply }}</p>
+                        </div>
+                    </div>
+                    <div v-if="repairs.length === 0" class="empty-state">
+                        <p>暂无报修记录</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 添加报修 -->
+            <div v-if="currentView === 'addRepair'">
+                <button @click="showMyRepairs" class="btn-back">← 返回</button>
+                <div class="form-container">
+                    <h2>新增报修</h2>
+                    <form @submit.prevent="submitRepair">
+                        <div class="form-group">
+                            <label>房屋ID：</label>
+                            <input type="number" v-model="repairForm.houseId" required>
+                        </div>
+                        <div class="form-group">
+                            <label>报修标题：</label>
+                            <input type="text" v-model="repairForm.title" required>
+                        </div>
+                        <div class="form-group">
+                            <label>报修描述：</label>
+                            <textarea v-model="repairForm.description" rows="4"></textarea>
+                        </div>
+                        <button type="submit" class="btn-primary">提交</button>
+                        <button type="button" @click="showMyRepairs" class="btn-secondary">取消</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 维修管理（房东） -->
+            <div v-if="currentView === 'landlordRepairs'">
+                <div class="page-header">
+                    <h2>维修管理</h2>
+                </div>
+                <div class="repair-list">
+                    <div v-for="repair in repairs" :key="repair.id" class="repair-card">
+                        <div class="repair-header">
+                            <h3>{{ repair.title }}</h3>
+                            <span class="status" :class="repair.status.toLowerCase()">{{ getRepairStatusText(repair.status) }}</span>
+                        </div>
+                        <p class="repair-description">{{ repair.description }}</p>
+                        <div class="repair-info">
+                            <p><strong>房屋ID：</strong>{{ repair.houseId }}</p>
+                            <p><strong>租客ID：</strong>{{ repair.tenantId }}</p>
+                            <p><strong>创建时间：</strong>{{ formatDate(repair.createTime) }}</p>
+                        </div>
+                        <div class="repair-actions" v-if="repair.status === 'PENDING'">
+                            <button @click="updateRepairStatus(repair.id, 'PROCESSING', '')" class="btn-primary">开始处理</button>
+                            <button @click="updateRepairStatus(repair.id, 'COMPLETED', '已完成')" class="btn-secondary">标记完成</button>
+                        </div>
+                    </div>
+                    <div v-if="repairs.length === 0" class="empty-state">
+                        <p>暂无报修记录</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 消息提示 -->
+        <div v-if="message" class="message" :class="messageType">
+            {{ message }}
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
